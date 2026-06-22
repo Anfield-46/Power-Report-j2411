@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบติดตามพลังงานไฟฟ้า | Mining Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #111827;
+    --bg-card: #1a2234;
+    --bg-card-hover: #1e2a3e;
+    --accent-gold: #f5a623;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --accent-cyan: #06b6d4;
+    --text-primary: #f0f4ff;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border: #1e3a5f;
+    --border-light: #2d4a6e;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --shadow-glow: 0 0 20px rgba(59,130,246,0.15);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Sarabun', 'Inter', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    background: linear-gradient(135deg, #0d1b2e 0%, #1a2e4a 50%, #0d1b2e 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--accent-gold), #e08a00);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; box-shadow: 0 2px 12px rgba(245,166,35,0.4);
+  }
+  .header-title { font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.3px; }
+  .header-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .live-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 20px; padding: 4px 12px; font-size: 11px; color: var(--accent-green); font-weight: 600;
+  }
+  .live-dot { width: 7px; height: 7px; background: var(--accent-green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .viewer-badge {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 20px; padding: 4px 12px; font-size: 11px; color: var(--accent-blue);
+  }
+  .last-update { font-size: 11px; color: var(--text-muted); }
+  .btn-print {
+    background: rgba(245,166,35,0.15); border: 1px solid rgba(245,166,35,0.4);
+    color: var(--accent-gold); padding: 6px 14px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 600; transition: all 0.2s; font-family: inherit;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-print:hover { background: rgba(245,166,35,0.25); }
+  .btn-nav {
+    background: linear-gradient(135deg, #ef4444, #c0392b);
+    border: none; color: white; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 700; font-family: inherit;
+    display: flex; align-items: center; gap: 6px; transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(239,68,68,0.3);
+    text-decoration: none;
+  }
+  .btn-nav:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(239,68,68,0.4); }
+
+  /* ===== CONTROLS ===== */
+  .controls-bar {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .control-group { display: flex; align-items: center; gap: 8px; }
+  .control-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  select {
+    background: var(--bg-card); border: 1px solid var(--border-light);
+    color: var(--text-primary); padding: 7px 12px; border-radius: 8px;
+    font-size: 13px; font-family: inherit; cursor: pointer; outline: none;
+    transition: border-color 0.2s;
+  }
+  select:hover, select:focus { border-color: var(--accent-blue); }
+  .divider { width: 1px; height: 24px; background: var(--border); }
+  .search-info { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main { padding: 20px 24px; }
+
+  /* ===== SUMMARY CARDS ===== */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 20px;
+  }
+  .summary-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; position: relative; overflow: hidden; transition: all 0.2s;
+  }
+  .summary-card:hover { background: var(--bg-card-hover); box-shadow: var(--shadow-glow); }
+  .card-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 12px 12px 0 0; }
+  .card-icon { font-size: 22px; margin-bottom: 8px; }
+  .card-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; margin-bottom: 4px; }
+  .card-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; line-height: 1; }
+  .card-unit { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  .card-sub { font-size: 11px; color: var(--text-secondary); margin-top: 6px; }
+  .trend-up { color: var(--accent-red); }
+  .trend-down { color: var(--accent-green); }
+
+  /* ===== CHARTS SECTION ===== */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .chart-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; 
+  }
+  .chart-card.full-width { grid-column: 1 / -1; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .chart-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .chart-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .chart-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chart-wrap { position: relative; height: 220px; }
+  .chart-wrap.tall { height: 260px; }
+
+  /* ===== MACHINE TABLE ===== */
+  .machine-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: 13px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.5px; padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th:first-child { text-align: left; }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(30,58,95,0.5); text-align: right; font-size: 13px; }
+  td:first-child { text-align: left; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(59,130,246,0.05); }
+  .machine-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  }
+  .badge-a { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .badge-b { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+  .badge-n { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,0.3); }
+  .badge-shovel { background: rgba(245,166,35,0.15); color: #fbbf24; border: 1px solid rgba(245,166,35,0.3); }
+  .badge-bwe { background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); }
+  .shovel-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    color: var(--accent-gold); font-size: 11px; font-weight: 600;
+    text-decoration: none; background: rgba(245,166,35,0.1); padding: 2px 8px; border-radius: 4px;
+    border: 1px solid rgba(245,166,35,0.2); transition: all 0.2s; cursor: pointer;
+  }
+  .shovel-link:hover { background: rgba(245,166,35,0.2); color: #fbbf24; }
+  .kwh-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .thb-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent-gold); }
+  .pct-bar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .bar-bg { width: 60px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; }
+  .pct-txt { font-size: 11px; color: var(--text-secondary); min-width: 32px; text-align: right; }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    text-align: center; padding: 16px; color: var(--text-muted); font-size: 11px;
+    border-top: 1px solid var(--border); margin-top: 20px;
+  }
+
+  /* ===== LOADING ===== */
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(10,14,26,0.9);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; gap: 16px;
+  }
+  .spinner {
+    width: 48px; height: 48px; border: 3px solid var(--border);
+    border-top-color: var(--accent-gold); border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== PRINT ===== */
+  @media print {
+    @page { size: A4; margin: 15mm; }
+    body { background: white !important; color: black !important; }
+    .header, .controls-bar { background: #1a2234 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .loading-overlay, .btn-print, .btn-nav { display: none !important; }
+    .main { padding: 10px !important; }
+    .summary-grid { grid-template-columns: repeat(5, 1fr) !important; }
+    .charts-row { grid-template-columns: 1fr 1fr !important; break-inside: avoid; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div style="color:var(--text-secondary);font-size:13px">กำลังโหลดข้อมูล...</div>
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="header-title">ระบบติดตามพลังงานไฟฟ้า — Mining Operations</div>
+      <div class="header-subtitle">Energy Monitoring Dashboard · Real-time Data from Google Sheets</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+    <div class="viewer-badge">👁 <span id="viewerCount">—</span> views</div>
+    <div class="last-update" id="lastUpdate">อัพเดตล่าสุด: —</div>
+    <button class="btn-print" onclick="window.print()">🖨️ พิมพ์ A4</button>
+    <a class="btn-nav" href="shovel.html">⛏️ Shovel Detail →</a>
+  </div>
+</header>
+
+<!-- CONTROLS -->
+<div class="controls-bar">
+  <div class="control-group">
+    <span class="control-label">มุมมอง</span>
+    <select id="viewMode" onchange="onViewChange()">
+      <option value="daily">รายวัน</option>
+      <option value="monthly">รายเดือน</option>
+      <option value="yearly">รายปี</option>
+    </select>
+  </div>
+  <div class="divider"></div>
+  <div class="control-group" id="yearGroup">
+    <span class="control-label">ปี</span>
+    <select id="yearSel" onchange="filterData()">
+      <option value="all">ทั้งหมด</option>
+      <option value="2022">2022</option><option value="2023">2023</option><option value="2024">2024</option>
+      <option value="2025" selected>2025</option><option value="2026">2026</option>
+      <option value="2027">2027</option><option value="2028">2028</option><option value="2029">2029</option>
+    </select>
+  </div>
+  <div class="control-group" id="monthGroup">
+    <span class="control-label">เดือน</span>
+    <select id="monthSel" onchange="filterData()">
+      <option value="all">ทั้งหมด</option>
+      <option value="1">มกราคม</option><option value="2">กุมภาพันธ์</option><option value="3">มีนาคม</option>
+      <option value="4">เมษายน</option><option value="5">พฤษภาคม</option><option value="6">มิถุนายน</option>
+      <option value="7">กรกฎาคม</option><option value="8">สิงหาคม</option><option value="9">กันยายน</option>
+      <option value="10">ตุลาคม</option><option value="11">พฤศจิกายน</option><option value="12">ธันวาคม</option>
+    </select>
+  </div>
+  <div class="control-group" id="dayGroup" style="display:none">
+    <span class="control-label">วันที่</span>
+    <select id="daySel" onchange="filterData()">
+      <option value="all">ทั้งหมด</option>
+    </select>
+  </div>
+  <div class="search-info" id="searchInfo">— รายการ</div>
+</div>
+
+<!-- MAIN -->
+<main class="main" id="mainContent">
+
+  <!-- SUMMARY CARDS -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="card-accent" style="background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div>
+      <div class="card-icon">🔋</div>
+      <div class="card-label">พลังงานรวม (Overall)</div>
+      <div class="card-value" id="totalEnergy" style="color:#60a5fa">—</div>
+      <div class="card-unit">kWh</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-accent" style="background:linear-gradient(90deg,#f5a623,#ef4444)"></div>
+      <div class="card-icon">💰</div>
+      <div class="card-label">ค่าไฟฟ้ารวม</div>
+      <div class="card-value" id="totalCost" style="color:#fbbf24">—</div>
+      <div class="card-unit">บาท (4.25 ฿/kWh)</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-accent" style="background:linear-gradient(90deg,#3b82f6,#6366f1)"></div>
+      <div class="card-icon">📡</div>
+      <div class="card-label">Line A — รวม</div>
+      <div class="card-value" id="lineATotal" style="color:#60a5fa">—</div>
+      <div class="card-unit">kWh</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-accent" style="background:linear-gradient(90deg,#10b981,#059669)"></div>
+      <div class="card-icon">📡</div>
+      <div class="card-label">Line B — รวม</div>
+      <div class="card-value" id="lineBTotal" style="color:#34d399">—</div>
+      <div class="card-unit">kWh</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-accent" style="background:linear-gradient(90deg,#8b5cf6,#a855f7)"></div>
+      <div class="card-icon">📡</div>
+      <div class="card-label">Line N — รวม</div>
+      <div class="card-value" id="lineNTotal" style="color:#a78bfa">—</div>
+      <div class="card-unit">kWh</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">พลังงานรายวัน — แนวโน้ม</div>
+          <div class="chart-subtitle">Overall Energy (kWh)</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">สัดส่วนพลังงานแต่ละ Line</div>
+          <div class="chart-subtitle">Line A / B / N Distribution</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Line A</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Line B</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Line N</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-row">
+    <div class="chart-card full-width">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">เปรียบเทียบพลังงานแต่ละระบบ (Conveyor / Shovel / BWE / Other)</div>
+          <div class="chart-subtitle">Stacked Bar Chart</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Conveyor</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>Shovel</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div>BWE</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#64748b"></div>Other</div>
+        </div>
+      </div>
+      <div class="chart-wrap tall"><canvas id="stackChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- MACHINE BREAKDOWN TABLE -->
+  <div class="machine-section">
+    <div class="section-header">
+      <div class="chart-title">สรุปการใช้พลังงานแยกตามเครื่องจักร</div>
+      <div style="font-size:11px;color:var(--text-muted)" id="periodLabel">ช่วงเวลาที่เลือก</div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>เครื่องจักร / Line</th>
+          <th>Conveyor (kWh)</th>
+          <th>Shovel (kWh)</th>
+          <th>BWE (kWh)</th>
+          <th>Other (kWh)</th>
+          <th>รวม (kWh)</th>
+          <th>ค่าไฟ (บาท)</th>
+          <th>สัดส่วน</th>
+        </tr>
+      </thead>
+      <tbody id="machineTable">
+        <tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">กำลังโหลด...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div>⚡ Mining Energy Dashboard · ข้อมูลจาก Google Sheets · อัพเดตอัตโนมัติทุก 5 นาที</div>
+  <div style="margin-top:4px">ราคาค่าไฟฟ้า 4.25 บาท/kWh · สงวนลิขสิทธิ์ © 2025</div>
+</footer>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SHEET_ID = '1_lHSTsfhY-_YrC60mjPtgqcPAjD7GpODj-YdX3CmMt0';
+const RATE = 4.25;
+const REFRESH_MS = 5 * 60 * 1000; // 5 min
+
+// ============================================================
+// VIEWER COUNT (localStorage)
+// ============================================================
+let viewCount = parseInt(localStorage.getItem('energyViewCount') || '0') + 1;
+localStorage.setItem('energyViewCount', viewCount);
+document.getElementById('viewerCount').textContent = viewCount.toLocaleString();
+
+// ============================================================
+// RAW DATA STATE
+// ============================================================
+let allRows = []; // parsed rows
+
+// ============================================================
+// DATE PARSER — handles Thai dates, dd/mm/yyyy, dd-mon-yy, etc.
+// ============================================================
+const THAI_MONTHS = {
+  'ม.ค.':1,'ก.พ.':2,'มี.ค.':3,'เม.ย.':4,'พ.ค.':5,'มิ.ย.':6,
+  'ก.ค.':7,'ส.ค.':8,'ก.ย.':9,'ต.ค.':10,'พ.ย.':11,'ธ.ค.':12,
+  'มกราคม':1,'กุมภาพันธ์':2,'มีนาคม':3,'เมษายน':4,'พฤษภาคม':5,'มิถุนายน':6,
+  'กรกฎาคม':7,'สิงหาคม':8,'กันยายน':9,'ตุลาคม':10,'พฤศจิกายน':11,'ธันวาคม':12
+};
+function parseDate(str) {
+  if (!str || typeof str !== 'string') return null;
+  str = str.trim();
+  // Thai format: "1-เม.ย.-25" or "6-เม.ย.-25"
+  let m = str.match(/^(\d+)-([ก-๙.]+)-(\d+)$/);
+  if (m) {
+    let day = parseInt(m[1]), mn = THAI_MONTHS[m[2]], yr = parseInt(m[3]);
+    if (yr < 100) yr += (yr < 70 ? 2000 : 1900);
+    if (mn) return new Date(yr, mn-1, day);
+  }
+  // dd/mm/yyyy or d/m/yyyy
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let day=parseInt(m[1]), mn=parseInt(m[2]), yr=parseInt(m[3]);
+    if (yr < 100) yr += 2000;
+    return new Date(yr, mn-1, day);
+  }
+  // yyyy-mm-dd
+  m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  return null;
+}
+
+function toNum(v) {
+  if (v === undefined || v === null || v === '') return 0;
+  return parseFloat(String(v).replace(/,/g,'')) || 0;
+}
+function fmt(n) { return Math.round(n).toLocaleString('th-TH'); }
+function fmtM(n) { return (n/1e6).toFixed(2) + 'M'; }
+
+// ============================================================
+// FETCH DATA
+// ============================================================
+async function fetchData() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=Sheet1`;
+  try {
+    const res = await fetch(url);
+    const csv = await res.text();
+    parseCSV(csv);
+  } catch(e) {
+    console.warn('Fetch failed, using demo data:', e);
+    loadDemoData();
+  }
+}
+
+function parseCSV(csv) {
+  const result = Papa.parse(csv, { skipEmptyLines: true });
+  const rows = result.data;
+  // Find header row (row with "Date" in col B = index 1)
+  let dataStart = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (r[1] && String(r[1]).trim().toLowerCase().includes('date')) { dataStart = i + 1; break; }
+    // Skip rows until we find date-like data
+  }
+  if (dataStart < 0) {
+    // Try to find first row with a parseable date in col B (index 1)
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i][1] && parseDate(rows[i][1])) { dataStart = i; break; }
+    }
+  }
+  allRows = [];
+  for (let i = dataStart; i < rows.length; i++) {
+    const r = rows[i];
+    const d = parseDate(r[1]);
+    if (!d) continue;
+    allRows.push({
+      date: d,
+      // System A: C=convA, D=shovelA, E=bweA, F=otherA, G=totalA
+      convA: toNum(r[2]), shovelA: toNum(r[3]), bweA: toNum(r[4]), otherA: toNum(r[5]), totalA: toNum(r[6]),
+      // System B: H=convB, I=shovelB, J=otherB, K=totalB
+      convB: toNum(r[7]), shovelB: toNum(r[8]), otherB: toNum(r[9]), totalB: toNum(r[10]),
+      // System N: L=convN, M=shovelN, N=otherN, O=totalN
+      convN: toNum(r[11]), shovelN: toNum(r[12]), otherN: toNum(r[13]), totalN: toNum(r[14]),
+      // P=overall
+      overall: toNum(r[15])
+    });
+  }
+  if (allRows.length === 0) { loadDemoData(); return; }
+  document.getElementById('lastUpdate').textContent = 'อัพเดต: ' + new Date().toLocaleTimeString('th-TH');
+  filterData();
+  hideLoading();
+}
+
+// ============================================================
+// DEMO DATA (fallback when sheet not published)
+// ============================================================
+function loadDemoData() {
+  const raw = [
+    ['6/4/2025',705874,72096,16500,0,794470,191994,18881,2487,213362,107561,0,1775,109336,1117168],
+    ['7/4/2025',460639,37740,14200,0,512579,388596,42071,0,430667,115774,0,2934,118708,1061954],
+    ['8/4/2025',530947,58045,1200,0,590192,223938,15675,133,239746,116364,0,1551,117915,947853],
+    ['9/4/2025',447475,45360,800,0,493635,499394,46619,0,546013,0,0,2546,2546,1042194],
+    ['10/4/2025',368463,35454,6500,0,410417,512898,68680,0,581578,111146,0,1471,112617,1104612],
+    ['11/4/2025',0,0,700,19309,20009,519423,86432,0,605855,240456,0,0,240456,866320],
+    ['12/4/2025',443614,44249,800,0,488663,182888,28484,2865,214237,32923,0,1155,34078,736978],
+    ['13/4/2025',0,0,700,6520,7220,0,0,4653,4653,0,0,2371,2371,14244],
+    ['14/4/2025',600272,75701,14000,0,689973,0,0,4223,4223,0,0,2316,2316,696512],
+    ['15/4/2025',508215,58665,15500,0,582380,0,0,6615,6615,0,0,2461,2461,591456],
+    ['16/4/2025',456221,46578,13000,0,515799,424154,49081,0,473235,0,0,2498,2498,991532],
+    ['17/4/2025',184497,18413,4900,4770,212580,380499,59854,0,440353,114051,0,4934,118985,771918],
+    ['18/4/2025',664423,61486,18600,0,744509,247049,32979,2254,282282,110990,0,3768,114758,1141549],
+    ['19/4/2025',607745,56924,1500,0,666169,365867,34728,0,400595,26482,0,1334,27816,1094580],
+    ['20/4/2025',764573,55470,12300,0,832343,258674,35069,3094,296837,127732,0,2257,129989,1259169],
+    ['21/4/2025',416226,30166,11500,0,457892,415037,51537,0,466574,90747,0,1328,92075,1016541],
+    ['22/4/2025',712955,59505,5200,0,777660,245514,36366,4359,286239,115827,0,1523,117350,1181249],
+    ['23/4/2025',709272,44872,2600,0,756744,361445,44738,0,406183,0,0,2595,2595,1165522],
+    ['24/4/2025',770736,56454,10000,0,837190,202551,31680,2443,236674,54245,0,1428,55673,1129537],
+    ['25/4/2025',466620,25915,10600,0,503135,463054,68404,0,531458,97547,0,1283,98830,1133423],
+    ['26/4/2025',769329,45706,14400,0,829435,361654,54027,0,415681,0,0,2912,2912,1248028],
+    ['27/4/2025',479691,42666,10700,0,533057,0,0,5415,5415,156217,0,0,156217,694689],
+    ['28/4/2025',576876,50904,12100,0,639880,0,0,5256,5256,138016,0,1306,139322,784458],
+    ['29/4/2025',330727,25854,8100,3965,368646,413923,54579,0,468502,0,0,2307,2307,839455],
+    ['30/4/2025',551026,36411,9600,0,597037,354289,45857,0,400146,0,0,2229,2229,999412],
+    ['1/5/2025',626518,90648,17600,0,734766,0,0,6179,6179,0,0,2566,2566,743511],
+    ['2/5/2025',275283,26821,6200,0,308305,347672,48432,0,396104,103958,0,1798,105756,810164],
+    ['3/5/2025',729140,44158,16200,0,789497,506455,73067,0,579522,0,0,2749,2749,1371768],
+    ['4/5/2025',745594,55381,12500,0,813475,377992,48619,0,426611,0,0,2970,2970,1243056],
+    ['5/5/2025',654751,60833,11700,0,727284,303541,28139,0,331680,80081,0,1782,81863,1144134],
+    ['6/5/2025',0,0,900,7848,8748,458575,74033,0,532608,268292,0,0,268292,809648],
+    ['7/5/2025',500826,42159,800,0,543785,363751,46849,0,410600,64039,0,0,64039,1018424],
+    ['8/5/2025',613216,61396,9100,0,683712,0,0,4726,4726,247593,0,0,247593,936031],
+    ['9/5/2025',550317,41831,15800,0,607948,393920,50429,0,444349,137695,0,1680,139375,1191672],
+    ['10/5/2025',563178,35481,10600,0,609259,241674,32910,2653,277237,136409,0,1401,137810,1024306],
+    ['11/5/2025',478579,75033,10700,0,564312,0,0,4737,4737,134756,0,0,134756,703805],
+    ['12/5/2025',657239,63030,11100,0,731369,100126,13983,2504,116613,151377,0,0,151377,999359],
+    ['13/5/2025',317559,45322,1000,4457,368338,0,0,4252,4252,236822,0,0,236822,609412],
+    ['14/5/2025',200555,29610,1100,6977,238242,0,0,4244,4244,89702,0,1492,91194,333680],
+    ['15/5/2025',410098,50207,800,0,461105,170636,26254,7391,204281,0,0,2790,2790,668176],
+    ['16/5/2025',343287,39436,600,0,383323,262227,25620,0,287847,0,0,2619,2619,673789],
+    ['17/5/2025',431280,43076,1000,0,475356,235227,22148,0,257375,0,0,2983,2983,735714],
+    ['18/5/2025',265862,19356,400,0,285618,247050,27329,0,274379,0,0,2679,2679,562676],
+  ];
+  allRows = raw.map(r => {
+    const d = parseDate(r[0]);
+    return {
+      date: d, convA: r[1], shovelA: r[2], bweA: r[3], otherA: r[4], totalA: r[5],
+      convB: r[6], shovelB: r[7], otherB: r[8], totalB: r[9],
+      convN: r[10], shovelN: r[11], otherN: r[12], totalN: r[13], overall: r[14]
+    };
+  });
+  document.getElementById('lastUpdate').textContent = 'Demo data (Sheet ยังไม่ได้ Publish)';
+  filterData();
+  hideLoading();
+}
+
+// ============================================================
+// FILTER & RENDER
+// ============================================================
+function onViewChange() {
+  const v = document.getElementById('viewMode').value;
+  document.getElementById('dayGroup').style.display = v === 'daily' ? 'flex' : 'none';
+  document.getElementById('monthGroup').style.display = v === 'yearly' ? 'none' : 'flex';
+  filterData();
+}
+
+function filterData() {
+  const view = document.getElementById('viewMode').value;
+  const yr = document.getElementById('yearSel').value;
+  const mn = document.getElementById('monthSel').value;
+
+  let filtered = allRows.filter(r => {
+    if (!r.date) return false;
+    if (yr !== 'all' && r.date.getFullYear() !== parseInt(yr)) return false;
+    if (view !== 'yearly' && mn !== 'all' && (r.date.getMonth()+1) !== parseInt(mn)) return false;
+    return true;
+  });
+
+  document.getElementById('searchInfo').textContent = `${filtered.length} รายการ`;
+  renderAll(filtered, view);
+}
+
+// ============================================================
+// AGGREGATE
+// ============================================================
+function aggregate(rows, view) {
+  if (view === 'daily') return rows.map(r => ({
+    label: r.date.toLocaleDateString('th-TH', {day:'2-digit',month:'short'}),
+    convA: r.convA, shovelA: r.shovelA, bweA: r.bweA, otherA: r.otherA, totalA: r.totalA,
+    convB: r.convB, shovelB: r.shovelB, otherB: r.otherB, totalB: r.totalB,
+    convN: r.convN, shovelN: r.shovelN, otherN: r.otherN, totalN: r.totalN, overall: r.overall
+  }));
+
+  const map = {};
+  rows.forEach(r => {
+    let key;
+    if (view === 'monthly') key = `${r.date.getFullYear()}-${String(r.date.getMonth()+1).padStart(2,'0')}`;
+    else key = String(r.date.getFullYear());
+    if (!map[key]) map[key] = {label: key, convA:0,shovelA:0,bweA:0,otherA:0,totalA:0,convB:0,shovelB:0,otherB:0,totalB:0,convN:0,shovelN:0,otherN:0,totalN:0,overall:0};
+    const m = map[key];
+    ['convA','shovelA','bweA','otherA','totalA','convB','shovelB','otherB','totalB','convN','shovelN','otherN','totalN','overall'].forEach(k => m[k] += r[k]);
+  });
+  return Object.values(map).sort((a,b) => a.label.localeCompare(b.label));
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+let charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderAll(rows, view) {
+  const agg = aggregate(rows, view);
+
+  // SUMMARY CARDS
+  let sumOverall=0, sumA=0, sumB=0, sumN=0;
+  rows.forEach(r => { sumOverall+=r.overall; sumA+=r.totalA; sumB+=r.totalB; sumN+=r.totalN; });
+  document.getElementById('totalEnergy').textContent = fmt(sumOverall);
+  document.getElementById('totalCost').textContent = fmt(sumOverall * RATE);
+  document.getElementById('lineATotal').textContent = fmt(sumA);
+  document.getElementById('lineBTotal').textContent = fmt(sumB);
+  document.getElementById('lineNTotal').textContent = fmt(sumN);
+
+  const labels = agg.map(r => r.label);
+
+  // TREND CHART
+  destroyChart('trend');
+  charts['trend'] = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Overall kWh', data: agg.map(r => r.overall),
+        borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.12)',
+        fill: true, tension: 0.4, pointRadius: agg.length > 20 ? 0 : 3,
+        borderWidth: 2, pointBackgroundColor: '#3b82f6'
+      }]
+    },
+    options: chartOpts('kWh')
+  });
+
+  // PIE CHART
+  destroyChart('pie');
+  charts['pie'] = new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Line A','Line B','Line N'],
+      datasets: [{ data: [sumA, sumB, sumN], backgroundColor: ['#3b82f6','#10b981','#8b5cf6'], borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} kWh` } }
+      },
+      cutout: '65%'
+    }
+  });
+
+  // STACK CHART
+  destroyChart('stack');
+  charts['stack'] = new Chart(document.getElementById('stackChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Conveyor', data: agg.map(r => r.convA+r.convB+r.convN), backgroundColor: '#3b82f6', stack: 's' },
+        { label: 'Shovel',   data: agg.map(r => r.shovelA+r.shovelB+r.shovelN), backgroundColor: '#f5a623', stack: 's' },
+        { label: 'BWE',      data: agg.map(r => r.bweA), backgroundColor: '#06b6d4', stack: 's' },
+        { label: 'Other',    data: agg.map(r => r.otherA+r.otherB+r.otherN), backgroundColor: '#64748b', stack: 's' },
+      ]
+    },
+    options: { ...chartOpts('kWh'), scales: { ...chartOpts('kWh').scales, x: { stacked: true, ...chartOpts('kWh').scales.x }, y: { stacked: true, ...chartOpts('kWh').scales.y } } }
+  });
+
+  // MACHINE TABLE
+  const totalAll = sumOverall || 1;
+  const machines = [
+    { name: 'สายพาน Line A', badge: 'badge-a', icon: '📡',
+      conv: rows.reduce((s,r)=>s+r.convA,0), shovel: rows.reduce((s,r)=>s+r.shovelA,0),
+      bwe: rows.reduce((s,r)=>s+r.bweA,0), other: rows.reduce((s,r)=>s+r.otherA,0),
+      total: sumA },
+    { name: 'สายพาน Line B', badge: 'badge-b', icon: '📡',
+      conv: rows.reduce((s,r)=>s+r.convB,0), shovel: rows.reduce((s,r)=>s+r.shovelB,0),
+      bwe: 0, other: rows.reduce((s,r)=>s+r.otherB,0), total: sumB },
+    { name: 'สายพาน Line N', badge: 'badge-n', icon: '📡',
+      conv: rows.reduce((s,r)=>s+r.convN,0), shovel: rows.reduce((s,r)=>s+r.shovelN,0),
+      bwe: 0, other: rows.reduce((s,r)=>s+r.otherN,0), total: sumN },
+    { name: 'Shovel (EX3600 & EX2500)', badge: 'badge-shovel', icon: '⛏️', isShovel: true,
+      conv: 0,
+      shovel: rows.reduce((s,r)=>s+r.shovelA+r.shovelB+r.shovelN,0),
+      bwe: 0, other: 0,
+      total: rows.reduce((s,r)=>s+r.shovelA+r.shovelB+r.shovelN,0) },
+    { name: 'BWE (Bucket Wheel)', badge: 'badge-bwe', icon: '🔩',
+      conv: 0, shovel: 0, bwe: rows.reduce((s,r)=>s+r.bweA,0), other: 0,
+      total: rows.reduce((s,r)=>s+r.bweA,0) },
+  ];
+  const tbody = document.getElementById('machineTable');
+  tbody.innerHTML = machines.map(m => {
+    const pct = totalAll > 0 ? (m.total/totalAll*100) : 0;
+    const color = m.badge === 'badge-a' ? '#3b82f6' : m.badge === 'badge-b' ? '#10b981' : m.badge === 'badge-n' ? '#8b5cf6' : m.badge === 'badge-shovel' ? '#f5a623' : '#06b6d4';
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="machine-badge ${m.badge}">${m.icon} ${m.name}</span>
+          ${m.isShovel ? `<a class="shovel-link" href="shovel.html">⛏️ ดูรายละเอียด →</a>` : ''}
+        </div>
+      </td>
+      <td class="kwh-value">${m.conv > 0 ? fmt(m.conv) : '—'}</td>
+      <td class="kwh-value">${m.shovel > 0 ? fmt(m.shovel) : '—'}</td>
+      <td class="kwh-value">${m.bwe > 0 ? fmt(m.bwe) : '—'}</td>
+      <td class="kwh-value">${m.other > 0 ? fmt(m.other) : '—'}</td>
+      <td class="kwh-value" style="font-weight:700">${fmt(m.total)}</td>
+      <td class="thb-value">${fmt(m.total * RATE)}</td>
+      <td>
+        <div class="pct-bar">
+          <div class="bar-bg"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+          <span class="pct-txt">${pct.toFixed(1)}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') + `<tr style="background:rgba(59,130,246,0.05)">
+    <td style="font-weight:700;color:var(--text-primary)">🔋 รวมทั้งหมด</td>
+    <td></td><td></td><td></td><td></td>
+    <td class="kwh-value" style="font-weight:700;color:#60a5fa">${fmt(sumOverall)}</td>
+    <td class="thb-value" style="font-weight:700">${fmt(sumOverall*RATE)}</td>
+    <td><span style="font-size:11px;color:var(--text-muted)">100%</span></td>
+  </tr>`;
+}
+
+function chartOpts(unit) {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1a2234', borderColor: '#2d4a6e', borderWidth: 1,
+        titleColor: '#f0f4ff', bodyColor: '#94a3b8',
+        callbacks: { label: ctx => ` ${ctx.dataset.label || ''}: ${fmt(ctx.raw)} ${unit}` }
+      }
+    },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 12 } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v } }
+    }
+  };
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+// ============================================================
+// INIT
+// ============================================================
+fetchData();
+setInterval(fetchData, REFRESH_MS);
+</script>
+</body>
+</html>
